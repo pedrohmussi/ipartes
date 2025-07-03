@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Cotação IPARTES</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="logo.png" alt="IPARTES Logo" class="logo">
+            <h1>SISTEMA DE COTAÇÃO IPARTES</h1>
+        </header>
+
+        <div class="nav-button">
+            <a href="/cadastro-fornecedor.html" class="btn btn-success">
+                <i class="fas fa-plus"></i> Cadastrar Fornecedor
+            </a>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">1. Inserção da Pesquisa</h2>
+            <textarea id="productInput" class="product-input" placeholder="Digite aqui os itens para cotação. Exemplo: Sensor vazão mássico ;conexão ao processo: flange 4" 300 FR; vazão máx. 272,160 kg/h; saída: digital; IP 67; Grupo IIA; Classe de temperatura T2; Tp: EMERSON CMF300M426N2BZPZZZ 2 unidades"></textarea>
+            <button id="generateBtn" class="btn btn-primary">
+                <i class="fas fa-sync-alt"></i> Gerar Cotação
+            </button>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">2. Email para Cotação</h2>
+            <div id="emailOutput" class="email-output"></div>
+            <button id="copyEmailBtn" class="btn copy-btn" style="display: none;">
+                <i class="fas fa-copy"></i> Copiar Email
+            </button>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">3. Emails de Fornecedores</h2>
+            <div id="suppliersOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elementos DOM
+            const productInput = document.getElementById('productInput');
+            const generateBtn = document.getElementById('generateBtn');
+            const emailOutput = document.getElementById('emailOutput');
+            const copyEmailBtn = document.getElementById('copyEmailBtn');
+            const suppliersOutput = document.getElementById('suppliersOutput');
+
+            // Event listeners
+            generateBtn.addEventListener('click', generateQuote);
+            copyEmailBtn.addEventListener('click', copyEmail);
+
+            // Funções
+            async function generateQuote() {
+                const productText = productInput.value.trim();
+                
+                if (!productText) {
+                    alert('Por favor, insira os dados do produto para cotação.');
+                    return;
+                }
+                
+                // Mostrar indicador de carregamento
+                emailOutput.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Gerando email...</div>';
+                suppliersOutput.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Buscando fornecedores...</div>';
+                copyEmailBtn.style.display = 'none';
+                
+                try {
+                    // Gerar email
+                    const emailResponse = await fetch('/api/generate-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ productInput: productText })
+                    });
+                    
+                    if (!emailResponse.ok) {
+                        throw new Error('Erro ao gerar email');
+                    }
+                    
+                    const emailData = await emailResponse.json();
+                    emailOutput.textContent = emailData.email;
+                    copyEmailBtn.style.display = 'inline-flex';
+                    
+                    // Buscar fornecedores
+                    const suppliersResponse = await fetch('/api/find-suppliers', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ productInput: productText })
+                    });
+                    
+                    if (!suppliersResponse.ok) {
+                        throw new Error('Erro ao buscar fornecedores');
+                    }
+                    
+                    const suppliersData = await suppliersResponse.json();
+                    renderSuppliers(suppliersData.suppliers, suppliersData.registeredSuppliers);
+                    
+                } catch (error) {
+                    console.error('Erro:', error);
+                    emailOutput.innerHTML = '<div class="error">Erro ao gerar email. Tente novamente.</div>';
+                    suppliersOutput.innerHTML = '<div class="error">Erro ao buscar fornecedores. Tente novamente.</div>';
+                }
+            }
+            
+            function renderSuppliers(suppliers, registeredSuppliers) {
+                if (!suppliers || suppliers.length === 0) {
+                    suppliersOutput.innerHTML = '<div class="no-data">Nenhum fornecedor encontrado.</div>';
+                    return;
+                }
+                
+                const suppliersList = document.createElement('div');
+                suppliersList.className = 'suppliers-list';
+                
+                suppliers.forEach(email => {
+                    const isRegistered = registeredSuppliers && registeredSuppliers.includes(email);
+                    
+                    const emailElement = document.createElement('div');
+                    emailElement.className = isRegistered ? 'registered-supplier' : '';
+                    emailElement.textContent = email;
+                    
+                    suppliersList.appendChild(emailElement);
+                });
+                
+                suppliersOutput.innerHTML = '';
+                suppliersOutput.appendChild(suppliersList);
+            }
+            
+            function copyEmail() {
+                const emailText = emailOutput.textContent;
+                
+                if (!emailText) {
+                    return;
+                }
+                
+                // Criar elemento temporário para copiar
+                const tempElement = document.createElement('textarea');
+                tempElement.value = emailText;
+                document.body.appendChild(tempElement);
+                tempElement.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempElement);
+                
+                // Feedback visual
+                const originalText = copyEmailBtn.innerHTML;
+                copyEmailBtn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                
+                setTimeout(() => {
+                    copyEmailBtn.innerHTML = originalText;
+                }, 2000);
+            }
+        });
+    </script>
+</body>
+</html>

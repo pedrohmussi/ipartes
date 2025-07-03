@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro de Fornecedores - IPARTES</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="logo.png" alt="IPARTES Logo" class="logo">
+            <h1>CADASTRO DE FORNECEDORES</h1>
+        </header>
+
+        <div class="nav-button">
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar para Cotação
+            </a>
+        </div>
+
+        <div class="card">
+            <h2>Adicionar Novo Fornecedor</h2>
+            <div class="form-group">
+                <label for="manufacturer">Fabricante:</label>
+                <input type="text" id="manufacturer" placeholder="Ex: EMERSON, ROTORK, etc." required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email de Contato:</label>
+                <input type="email" id="email" placeholder="Ex: vendas@fornecedor.com" required>
+            </div>
+            <button id="addSupplier" class="btn btn-success">
+                <i class="fas fa-plus"></i> Adicionar Fornecedor
+            </button>
+        </div>
+
+        <div class="card">
+            <h2>Fornecedores Cadastrados</h2>
+            <div id="suppliersList">
+                <!-- Lista de fornecedores será carregada aqui -->
+                <div class="loading">Carregando fornecedores...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template para exibição de fornecedor -->
+    <template id="supplierTemplate">
+        <div class="supplier-item">
+            <div class="supplier-info">
+                <h3>Fabricante: <span class="manufacturer-name"></span></h3>
+                <div class="emails-list">
+                    <!-- Lista de emails será carregada aqui -->
+                </div>
+                <div class="add-email-form">
+                    <input type="email" class="new-email-input" placeholder="Adicionar novo email">
+                    <button class="btn btn-success add-email-btn">
+                        <i class="fas fa-plus"></i> Adicionar Email
+                    </button>
+                </div>
+            </div>
+            <button class="btn btn-danger delete-supplier">
+                <i class="fas fa-trash"></i> Excluir Fabricante
+            </button>
+        </div>
+    </template>
+
+    <!-- Template para exibição de email -->
+    <template id="emailTemplate">
+        <div class="email-item">
+            <span class="email-text"></span>
+            <button class="btn btn-small btn-danger delete-email">
+                <i class="fas fa-times"></i> Excluir
+            </button>
+        </div>
+    </template>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elementos DOM
+            const manufacturerInput = document.getElementById('manufacturer');
+            const emailInput = document.getElementById('email');
+            const addSupplierBtn = document.getElementById('addSupplier');
+            const suppliersList = document.getElementById('suppliersList');
+            const supplierTemplate = document.getElementById('supplierTemplate');
+            const emailTemplate = document.getElementById('emailTemplate');
+
+            // Carregar fornecedores
+            loadSuppliers();
+
+            // Event listeners
+            addSupplierBtn.addEventListener('click', addSupplier);
+
+            // Funções
+            async function loadSuppliers() {
+                try {
+                    const response = await fetch('/api/suppliers');
+                    const suppliers = await response.json();
+                    
+                    // Limpar lista
+                    suppliersList.innerHTML = '';
+                    
+                    if (suppliers.length === 0) {
+                        suppliersList.innerHTML = '<div class="no-data">Nenhum fornecedor cadastrado.</div>';
+                        return;
+                    }
+                    
+                    // Renderizar fornecedores
+                    suppliers.forEach(renderSupplier);
+                } catch (error) {
+                    console.error('Erro ao carregar fornecedores:', error);
+                    suppliersList.innerHTML = '<div class="error">Erro ao carregar fornecedores. Tente novamente.</div>';
+                }
+            }
+
+            function renderSupplier(supplier) {
+                // Clonar template
+                const supplierNode = document.importNode(supplierTemplate.content, true);
+                
+                // Preencher dados
+                supplierNode.querySelector('.manufacturer-name').textContent = supplier.manufacturer;
+                
+                // Configurar ID para o elemento
+                const supplierItem = supplierNode.querySelector('.supplier-item');
+                supplierItem.dataset.id = supplier.id;
+                
+                // Renderizar emails
+                const emailsList = supplierNode.querySelector('.emails-list');
+                
+                if (supplier.emails && supplier.emails.length > 0) {
+                    supplier.emails.forEach(email => {
+                        const emailNode = renderEmail(email, supplier.id);
+                        emailsList.appendChild(emailNode);
+                    });
+                } else {
+                    emailsList.innerHTML = '<div class="no-data">Nenhum email cadastrado.</div>';
+                }
+                
+                // Configurar botão de adicionar email
+                const addEmailForm = supplierNode.querySelector('.add-email-form');
+                const newEmailInput = addEmailForm.querySelector('.new-email-input');
+                const addEmailBtn = addEmailForm.querySelector('.add-email-btn');
+                
+                addEmailBtn.addEventListener('click', async () => {
+                    const email = newEmailInput.value.trim();
+                    if (!email) return;
+                    
+                    try {
+                        const response = await fetch(`/api/suppliers/${supplier.id}/emails`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ email })
+                        });
+                        
+                        if (response.ok) {
+                            // Limpar input
+                            newEmailInput.value = '';
+                            
+                            // Recarregar fornecedores
+                            loadSuppliers();
+                        } else {
+                            const error = await response.json();
+                            alert(error.error || 'Erro ao adicionar email');
+                        }
+                    } catch (error) {
+                        console.error('Erro ao adicionar email:', error);
+                        alert('Erro ao adicionar email. Tente novamente.');
+                    }
+                });
+                
+                // Configurar botão de excluir fornecedor
+                const deleteBtn = supplierNode.querySelector('.delete-supplier');
+                deleteBtn.addEventListener('click', async () => {
+                    if (!confirm(`Tem certeza que deseja excluir o fornecedor ${supplier.manufacturer} e todos os seus emails?`)) {
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/api/suppliers/${supplier.id}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            // Recarregar fornecedores
+                            loadSuppliers();
+                        } else {
+                            const error = await response.json();
+                            alert(error.error || 'Erro ao excluir fornecedor');
+                        }
+                    } catch (error) {
+                        console.error('Erro ao excluir fornecedor:', error);
+                        alert('Erro ao excluir fornecedor. Tente novamente.');
+                    }
+                });
+                
+                // Adicionar à lista
+                suppliersList.appendChild(supplierNode);
+            }
+
+            function renderEmail(email, supplierId) {
+                // Clonar template
+                const emailNode = document.importNode(emailTemplate.content, true);
+                
+                // Preencher dados
+                emailNode.querySelector('.email-text').textContent = email;
+                
+                // Configurar botão de excluir email
+                const deleteBtn = emailNode.querySelector('.delete-email');
+                deleteBtn.addEventListener('click', async () => {
+                    if (!confirm(`Tem certeza que deseja excluir o email ${email}?`)) {
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/api/suppliers/${supplierId}/emails/${encodeURIComponent(email)}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            // Recarregar fornecedores
+                            loadSuppliers();
+                        } else {
+                            const error = await response.json();
+                            alert(error.error || 'Erro ao excluir email');
+                        }
+                    } catch (error) {
+                        console.error('Erro ao excluir email:', error);
+                        alert('Erro ao excluir email. Tente novamente.');
+                    }
+                });
+                
+                return emailNode.firstElementChild;
+            }
+
+            async function addSupplier() {
+                const manufacturer = manufacturerInput.value.trim();
+                const email = emailInput.value.trim();
+                
+                if (!manufacturer || !email) {
+                    alert('Fabricante e email são obrigatórios');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/suppliers', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ manufacturer, email })
+                    });
+                    
+                    if (response.ok) {
+                        // Limpar inputs
+                        manufacturerInput.value = '';
+                        emailInput.value = '';
+                        
+                        // Recarregar fornecedores
+                        loadSuppliers();
+                    } else {
+                        const error = await response.json();
+                        alert(error.error || 'Erro ao adicionar fornecedor');
+                    }
+                } catch (error) {
+                    console.error('Erro ao adicionar fornecedor:', error);
+                    alert('Erro ao adicionar fornecedor. Tente novamente.');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
