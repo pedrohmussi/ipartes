@@ -1,0 +1,19 @@
+[
+  {
+    "id": "1621518400000",
+    "manufacturer": "EMERSON",
+    "emails": [
+      "sales@emerson.com"
+    ],
+    "createdAt": "2025-05-20T13:06:40.000Z",
+    "updatedAt": "2025-05-20T14:52:41.294Z"
+  },
+  {
+    "id": "1621518500000",
+    "manufacturer": "ROTORK",
+    "emails": [
+      "sales@rotork.com"
+    ],
+    "createdAt": "2025-05-20T13:06:50.000Z"
+  }
+]
